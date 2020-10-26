@@ -7,7 +7,7 @@ import * as vscode from "vscode";
 import * as WinReg from "winreg";
 import * as util from "../common/util";
 
-import { resolveArduinoPath, validateArduinoPath } from "../common/platform";
+import { getDefaultCommandPath, resolveArduinoPath } from "../common/platform";
 
 import { VscodeSettings } from "./vscodeSettings";
 
@@ -52,9 +52,6 @@ export class ArduinoSettings implements IArduinoSettings {
         await this.tryGetDefaultBaudRate();
         if (platform === "win32") {
             await this.updateWindowsPath();
-            if (this._commandPath === "") {
-                this._commandPath = "arduino_debug.exe";
-            }
         } else if (platform === "linux") {
             if (util.directoryExistsSync(path.join(this._arduinoPath, "portable"))) {
                 this._packagePath = path.join(this._arduinoPath, "portable");
@@ -70,10 +67,6 @@ export class ArduinoSettings implements IArduinoSettings {
                 }
             } else {
                 this._sketchbookPath = path.join(process.env.HOME, "Arduino");
-            }
-
-            if (this._commandPath === "") {
-                this._commandPath = "arduino";
             }
         } else if (platform === "darwin") {
             if (util.directoryExistsSync(path.join(this._arduinoPath, "portable"))) {
@@ -91,12 +84,8 @@ export class ArduinoSettings implements IArduinoSettings {
             } else {
                 this._sketchbookPath = path.join(process.env.HOME, "Documents/Arduino");
             }
-
-            if (this._commandPath === "") {
-                this._commandPath = "/Contents/MacOS/Arduino";
-            }
         }
-    }
+     }
 
     public get arduinoPath(): string {
         return this._arduinoPath;
@@ -131,11 +120,16 @@ export class ArduinoSettings implements IArduinoSettings {
     }
 
     public get commandPath(): string {
+        let commandPath = this._commandPath;
+        if (commandPath === "") {
+            commandPath = getDefaultCommandPath(this.isArduinoCli);
+        }
+
         const platform = os.platform();
         if (platform === "darwin") {
-            return path.join(util.resolveMacArduinoAppPath(this._arduinoPath), path.normalize(this._commandPath));
+            return path.join(util.resolveMacArduinoAppPath(this._arduinoPath), path.normalize(commandPath));
         } else {
-            return path.join(this._arduinoPath, path.normalize(this._commandPath));
+            return path.join(this._arduinoPath, path.normalize(commandPath));
         }
     }
 
