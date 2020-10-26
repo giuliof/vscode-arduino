@@ -290,7 +290,7 @@ export class ArduinoApp {
             }
 
             if (this.isArduinoCli()) {
-                args.push("--build-path", `build.path=${outputPath}`);
+                args.push("--build-path", `${outputPath}`);
             } else {
                 args.push("--pref", `build.path=${outputPath}`);
             }
