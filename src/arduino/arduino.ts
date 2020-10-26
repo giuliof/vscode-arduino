@@ -157,7 +157,12 @@ export class ArduinoApp {
                 return;
             }
 
-            args.push("--pref", `build.path=${outputPath}`);
+            if (this.isArduinoCli()) {
+                args.push("--build-path", `${outputPath}`);
+            } else {
+                args.push("--pref", `build.path=${outputPath}`);
+            }
+
             arduinoChannel.info(`Please see the build logs in Output path: ${outputPath}`);
         } else {
             const msg = "Output path is not specified. Unable to reuse previously compiled files. Upload could be slow. See README.";
@@ -227,7 +232,12 @@ export class ArduinoApp {
                 return;
             }
 
-            args.push("--pref", `build.path=${outputPath}`);
+            if (this.isArduinoCli()) {
+                args.push("--build-path", `${outputPath}`);
+            } else {
+                args.push("--pref", `build.path=${outputPath}`);
+            }
+
             arduinoChannel.info(`Please see the build logs in Output path: ${outputPath}`);
         } else {
             const msg = "Output path is not specified. Unable to reuse previously compiled files. Upload could be slow. See README.";
@@ -290,7 +300,7 @@ export class ArduinoApp {
             }
 
             if (this.isArduinoCli()) {
-                args.push("--build-path", `build.path=${outputPath}`);
+                args.push("--build-path", `${outputPath}`);
             } else {
                 args.push("--pref", `build.path=${outputPath}`);
             }
