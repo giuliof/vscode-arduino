@@ -21,7 +21,7 @@ export function resolveArduinoPath(): string {
 }
 
 export function validateArduinoPath(arduinoPath: string, isArduinoCli = false): boolean {
-    return fileExistsSync(path.join(arduinoPath, isArduinoCli ? "arduino-cli" : "arduino"));
+    return fileExistsSync(path.join(arduinoPath, getDefaultCommandPath(isArduinoCli)));
 }
 
 export function findFile(fileName: string, cwd: string): string {
@@ -38,4 +38,8 @@ export function findFile(fileName: string, cwd: string): string {
         // Ignore the errors.
     }
     return pathString;
+}
+
+export function getDefaultCommandPath(isArduinoCli: boolean): string {
+    return isArduinoCli ? "arduino-cli" : "arduino";
 }

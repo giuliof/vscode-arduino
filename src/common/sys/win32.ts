@@ -28,7 +28,7 @@ export async function resolveArduinoPath() {
 }
 
 export function validateArduinoPath(arduinoPath: string, isArduinoCli = false): boolean {
-    return fileExistsSync(path.join(arduinoPath, isArduinoCli ? "arduino-cli.exe" : "arduino_debug.exe"));
+    return fileExistsSync(path.join(arduinoPath, getDefaultCommandPath(isArduinoCli)));
 
 }
 
@@ -44,4 +44,8 @@ export function findFile(fileName: string, cwd: string): string {
         // Ignore the errors.
     }
     return result;
+}
+
+export function getDefaultCommandPath(isArduinoCli: boolean): string {
+    return isArduinoCli ? "arduino-cli.exe" : "arduino_debug.exe";
 }
