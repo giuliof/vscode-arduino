@@ -140,8 +140,8 @@ export class ArduinoApp {
             }
         }
 
-        const appPath = this.isArduinoCli() ? ArduinoWorkspace.rootPath : path.join(ArduinoWorkspace.rootPath, dc.sketch);
-        const args = this.isArduinoCli() ? ["upload", "-b", boardDescriptor] : ["--upload", "--board", boardDescriptor];
+        const appPath = path.join(ArduinoWorkspace.rootPath, dc.sketch);
+        const args = this.isArduinoCli() ? ["compile", "--upload", "-b", boardDescriptor] : ["--upload", "--board", boardDescriptor];
         if (dc.port) {
             args.push("--port", dc.port);
         }
@@ -157,7 +157,12 @@ export class ArduinoApp {
                 return;
             }
 
-            args.push("--pref", `build.path=${outputPath}`);
+            if (this.isArduinoCli()) {
+                args.push("--build-path", `${outputPath}`);
+            } else {
+                args.push("--pref", `build.path=${outputPath}`);
+            }
+
             arduinoChannel.info(`Please see the build logs in Output path: ${outputPath}`);
         } else {
             const msg = "Output path is not specified. Unable to reuse previously compiled files. Upload could be slow. See README.";
@@ -213,9 +218,24 @@ export class ArduinoApp {
         UsbDetector.getInstance().pauseListening();
         await vscode.workspace.saveAll(false);
 
-        const appPath = this.isArduinoCli() ? ArduinoWorkspace.rootPath : path.join(ArduinoWorkspace.rootPath, dc.sketch);
-        const args = ["--upload", "--board", boardDescriptor, "--port", dc.port, "--useprogrammer",
-            "--pref", "programmer=" + selectProgrammer, appPath];
+        const appPath = path.join(ArduinoWorkspace.rootPath, dc.sketch);
+        const args: string[] = [];
+        if (this.isArduinoCli()) {
+            args.push(
+                "compile", "--upload", "-b", boardDescriptor,
+                "--programmer", selectProgrammer);
+        } else {
+            args.push(
+                "--upload", "--board", boardDescriptor,
+                "--useprogrammer", "--pref", "programmer=" + selectProgrammer);
+        }
+
+        if (dc.port) {
+            args.push("--port", dc.port);
+        }
+
+        args.push(appPath);
+
         if (VscodeSettings.getInstance().logLevel === "verbose") {
             args.push("--verbose");
         }
@@ -227,7 +247,12 @@ export class ArduinoApp {
                 return;
             }
 
-            args.push("--pref", `build.path=${outputPath}`);
+            if (this.isArduinoCli()) {
+                args.push("--build-path", `${outputPath}`);
+            } else {
+                args.push("--pref", `build.path=${outputPath}`);
+            }
+
             arduinoChannel.info(`Please see the build logs in Output path: ${outputPath}`);
         } else {
             const msg = "Output path is not specified. Unable to reuse previously compiled files. Upload could be slow. See README.";
@@ -276,7 +301,7 @@ export class ArduinoApp {
             }
         }
 
-        const appPath = this.isArduinoCli() ? ArduinoWorkspace.rootPath : path.join(ArduinoWorkspace.rootPath, dc.sketch);
+        const appPath = path.join(ArduinoWorkspace.rootPath, dc.sketch);
         const args = this.isArduinoCli() ? ["compile", "-b", boardDescriptor, appPath] : ["--verify", "--board", boardDescriptor, appPath];
         if (VscodeSettings.getInstance().logLevel === "verbose") {
             args.push("--verbose");
@@ -290,7 +315,7 @@ export class ArduinoApp {
             }
 
             if (this.isArduinoCli()) {
-                args.push("--build-path", `build.path=${outputPath}`);
+                args.push("--build-path", `${outputPath}`);
             } else {
                 args.push("--pref", `build.path=${outputPath}`);
             }
