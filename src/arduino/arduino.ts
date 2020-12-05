@@ -93,6 +93,9 @@ export class ArduinoApp {
         }
     }
 
+    /**
+     * Upload code
+     */
     public async upload() {
         const dc = DeviceContext.getInstance();
         const boardDescriptor = this.getBoardBuildString();
@@ -140,8 +143,9 @@ export class ArduinoApp {
             }
         }
 
-        const appPath = this.isArduinoCli() ? ArduinoWorkspace.rootPath : path.join(ArduinoWorkspace.rootPath, dc.sketch);
-        const args = this.isArduinoCli() ? ["upload", "-b", boardDescriptor] : ["--upload", "--board", boardDescriptor];
+        const appPath = this.useArduinoCli() ? ArduinoWorkspace.rootPath : path.join(ArduinoWorkspace.rootPath, dc.sketch);
+        // TODO: add the --clean argument to the cli args when v 0.14 is released (this will clean up the build folder after uploading)
+        const args = this.useArduinoCli() ? ["compile", "--upload", "-b", boardDescriptor] : ["--upload", "--board", boardDescriptor];
         if (dc.port) {
             args.push("--port", dc.port);
         }
@@ -173,6 +177,10 @@ export class ArduinoApp {
             arduinoChannel.error(`Exit with code=${reason.code}${os.EOL}`);
         });
     }
+
+    /**
+     * Upload code using specified programmer
+     */
 
     public async uploadUsingProgrammer() {
         const dc = DeviceContext.getInstance();
@@ -213,9 +221,11 @@ export class ArduinoApp {
         UsbDetector.getInstance().pauseListening();
         await vscode.workspace.saveAll(false);
 
-        const appPath = this.isArduinoCli() ? ArduinoWorkspace.rootPath : path.join(ArduinoWorkspace.rootPath, dc.sketch);
-        const args = ["--upload", "--board", boardDescriptor, "--port", dc.port, "--useprogrammer",
-            "--pref", "programmer=" + selectProgrammer, appPath];
+        const appPath = this.useArduinoCli() ? ArduinoWorkspace.rootPath : path.join(ArduinoWorkspace.rootPath, dc.sketch);
+        const args = this.useArduinoCli() ?
+                     ["compile", "--upload", "-b", boardDescriptor, "--port", dc.port, "--programmer", selectProgrammer, appPath] :
+                     ["--upload", "--board", boardDescriptor, "--port", dc.port, "--useprogrammer",
+                      "--pref", "programmer=" + selectProgrammer, appPath];
         if (VscodeSettings.getInstance().logLevel === "verbose") {
             args.push("--verbose");
         }
@@ -276,8 +286,8 @@ export class ArduinoApp {
             }
         }
 
-        const appPath = this.isArduinoCli() ? ArduinoWorkspace.rootPath : path.join(ArduinoWorkspace.rootPath, dc.sketch);
-        const args = this.isArduinoCli() ? ["compile", "-b", boardDescriptor, appPath] : ["--verify", "--board", boardDescriptor, appPath];
+        const appPath = this.useArduinoCli() ?  ArduinoWorkspace.rootPath : path.join(ArduinoWorkspace.rootPath, dc.sketch);
+        const args = this.useArduinoCli() ? ["compile", "-b", boardDescriptor, appPath] : ["--verify", "--board", boardDescriptor, appPath];
         if (VscodeSettings.getInstance().logLevel === "verbose") {
             args.push("--verbose");
         }
@@ -289,7 +299,7 @@ export class ArduinoApp {
                 return;
             }
 
-            if (this.isArduinoCli()) {
+            if (this.useArduinoCli()) {
                 args.push("--build-path", `build.path=${outputPath}`);
             } else {
                 args.push("--pref", `build.path=${outputPath}`);
@@ -483,9 +493,14 @@ export class ArduinoApp {
         }
     }
 
-    /**
-     * Install arduino board package based on package name and platform hardware architecture.
-     */
+     /**
+      * Installs arduino board package.
+      * (If using the aduino CLI this installs the corrosponding core.)
+      * @param {string} packageName - board vendor
+      * @param {string} arch - board architecture
+      * @param {string} version - version of board package or core to download
+      * @param {boolean} [showOutput=true] - show raw output from command
+      */
     public async installBoard(packageName: string, arch: string = "", version: string = "", showOutput: boolean = true) {
         arduinoChannel.show();
         const updatingIndex = packageName === "dummy" && !arch && !version;
@@ -493,23 +508,28 @@ export class ArduinoApp {
             arduinoChannel.start(`Update package index files...`);
         } else {
             try {
-                const packagePath = path.join(this._settings.packagePath, "packages", packageName);
+                const packagePath = path.join(this._settings.packagePath, "packages", packageName, arch);
                 if (util.directoryExistsSync(packagePath)) {
                     util.rmdirRecursivelySync(packagePath);
                 }
                 arduinoChannel.start(`Install package - ${packageName}...`);
             } catch (error) {
                 arduinoChannel.start(`Install package - ${packageName} failed under directory : ${error.path}${os.EOL}
-Please make sure the folder is not occupied by other procedures .`);
+                                      Please make sure the folder is not occupied by other procedures .`);
                 arduinoChannel.error(`Error message - ${error.message}${os.EOL}`);
                 arduinoChannel.error(`Exit with code=${error.code}${os.EOL}`);
                 return;
             }
         }
+        arduinoChannel.info(`${packageName}${arch && ":" + arch}${version && ":" + version}`);
         try {
-            await util.spawn(this._settings.commandPath,
-                showOutput ? arduinoChannel.channel : null,
-                ["--install-boards", `${packageName}${arch && ":" + arch}${version && ":" + version}`]);
+            this.useArduinoCli() ?
+                await util.spawn(this._settings.commandPath,
+                    showOutput ? arduinoChannel.channel : null,
+                    ["core", "install", `${packageName}${arch && ":" + arch}${version && "@" + version}`]) :
+                await util.spawn(this._settings.commandPath,
+                    showOutput ? arduinoChannel.channel : null,
+                    ["--install-boards", `${packageName}${arch && ":" + arch}${version && ":" + version}`]);
 
             if (updatingIndex) {
                 arduinoChannel.end("Updated package index files.");
@@ -536,6 +556,13 @@ Please make sure the folder is not occupied by other procedures .`);
         arduinoChannel.end(`Uninstalled board package - ${boardName}${os.EOL}`);
     }
 
+    /**
+     * Downloads or updates a library
+     * @param {string} libName - name of the library to download
+     * @param {string} version - version of library to download
+     * @param {boolean} [showOutput=true] - show raw output from command
+     */
+
     public async installLibrary(libName: string, version: string = "", showOutput: boolean = true) {
         arduinoChannel.show();
         const updatingIndex = (libName === "dummy" && !version);
@@ -545,6 +572,10 @@ Please make sure the folder is not occupied by other procedures .`);
             arduinoChannel.start(`Install library - ${libName}`);
         }
         try {
+            this.useArduinoCli() ?
+            await  util.spawn(this._settings.commandPath,
+                showOutput ? arduinoChannel.channel : null,
+                ["lib", "install", `${libName}${version && "@" + version}`]) :
             await util.spawn(this._settings.commandPath,
                 showOutput ? arduinoChannel.channel : null,
                 ["--install-library", `${libName}${version && ":" + version}`]);
@@ -740,8 +771,13 @@ Please make sure the folder is not occupied by other procedures .`);
         this._programmerManager = value;
     }
 
-    private isArduinoCli() {
-        return VscodeSettings.getInstance().isArduinoCli;
+    /**
+     * Checks if the arduino cli is being used
+     * @returns {bool} - true if arduino cli is being use
+     */
+    private useArduinoCli() {
+        return this._settings.useArduinoCli;
+        // return VscodeSettings.getInstance().useArduinoCli;
     }
 
     private getProgrammerString(): string {
